@@ -1,43 +1,7 @@
 # WindBladeLab
 
-**面向无人机风机叶片巡检的计算机视觉研究项目**  
-*Computer Vision for UAV-based Wind Turbine Blade Inspection*
+**English** | [简体中文](README.zh-CN.md)
 
-## 项目简介
+WindBladeLab is an open-source computer vision research project for UAV-based wind turbine blade inspection. It focuses on blade surface defect detection, image stitching and panorama construction, and 3D reconstruction and geometric modeling, aiming to explore an end-to-end technical workflow from UAV image acquisition and visual information processing to blade surface analysis.
 
-WindBladeLab 是一个面向无人机风力发电机叶片巡检的开源计算机视觉研究项目，聚焦叶片表面缺陷检测、图像拼接与全景构建、三维重建及几何建模，旨在探索从无人机图像采集、视觉信息处理到叶片表面分析的完整技术流程。
-
-项目以模块化、可扩展的研究代码库为建设目标，计划结合传统图像处理、深度学习与三维视觉方法，为风机叶片自动化巡检相关的算法研究、技术验证和工程应用探索提供基础。
-
-## 研究方向
-
-- **叶片表面缺陷检测**：研究基于无人机巡检图像的叶片表面缺陷识别与定位方法。
-- **图像拼接与全景构建**：研究多视角巡检图像的配准、拼接与叶片表面全景表达。
-- **三维重建与几何建模**：探索利用多视角图像恢复叶片三维结构与几何信息的方法。
-- **巡检视觉处理流程**：探索图像采集与数据组织、视觉处理及表面分析之间的模块化衔接。
-
-以上为项目关注的研究方向，不代表当前已具备相应实现。
-
-## 技术栈
-
-- **主要开发语言**：Python
-- **主要深度学习框架**：PyTorch
-- **方法基础**：传统图像处理、深度学习与三维视觉
-
-其他语言、工具与依赖将根据具体研究和工程需求逐步引入，并在对应模块中说明。
-
-## 项目状态
-
-项目目前处于初始化阶段，仓库暂仅包含项目说明与开源许可证，尚未提供可运行的算法模块、预训练权重、数据集或实验结果。
-
-后续模块将根据实际实现情况补充环境配置、使用方式和实验说明。当前尚无可执行的安装或运行流程。
-
-## 学术交流与贡献
-
-欢迎围绕研究方法、应用场景和技术实现通过 Issues 发起讨论，或通过 Pull Requests 贡献改进。
-
-提交图像、数据或代码前，请确保拥有相应的使用与公开授权；涉及风场、设备或其他敏感信息时，请先完成必要的脱敏处理。
-
-## 开源许可证
-
-本项目采用 [MIT License](LICENSE)。
+The project aims to provide a modular and extensible research codebase that brings together traditional image processing, deep learning, and 3D vision methods to support algorithm research, technical validation, and exploration of engineering applications in automated wind turbine blade inspection.
