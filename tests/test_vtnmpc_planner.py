@@ -296,3 +296,31 @@ def test_inspection_invalid_inputs(kwargs, parameter):
     arguments.update(kwargs)
     with pytest.raises(ValueError, match=parameter):
         plan_inspection(**arguments)
+
+
+@pytest.mark.parametrize("position", [[500000, 6000000, 0], [6000000] * 3])
+def test_dense_translated_public_planning(position):
+    model = Turbine(50, 3, 120, yaw=.37, rotor_angle=.29)
+    original = generate_mesh(model, segments=1000)
+    moved = generate_mesh(replace(model, position=position), segments=1000)
+    length_tol = 32 * np.finfo(float).eps * max(position)
+    for subset in ([(0, 0)], None):
+        reference = plan(original, spacing=7, surface_ids=subset)
+        result = plan(moved, spacing=7, surface_ids=subset)
+        assert set(result.surface_order) == set(reference.surface_order)
+        # At most 23 graph edges, each with two rounded endpoints.
+        assert result.distance == pytest.approx(reference.distance, rel=0, abs=46 * length_tol)
+        assert np.isfinite(result.points).all()
+        if subset is not None:
+            np.testing.assert_allclose(result.points - position, reference.points,
+                                       rtol=0, atol=length_tol)
+            np.testing.assert_allclose(result.normals, reference.normals,
+                                       rtol=0, atol=length_tol / .05)
+    upright = replace(model, rotor_angle=0)
+    reference = plan_inspection(upright, segments=1000, spacing=7)
+    stages = plan_inspection(replace(upright, position=position), segments=1000, spacing=7)
+    for before, after in zip(reference, stages):
+        assert set(after.surface_order) == set(before.surface_order)
+        assert after.distance == pytest.approx(before.distance, rel=0, abs=46 * length_tol)
+        assert np.isfinite(after.points).all() and np.isfinite(after.normals).all()
+    assert [len(stage.surface_order) for stage in stages] == [10, 2]

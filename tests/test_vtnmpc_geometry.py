@@ -203,3 +203,36 @@ def test_invalid_object_types():
         generate_mesh(None, segments=1)
     with pytest.raises(ValueError, match="mesh"):
         _group_surfaces(None)
+
+
+@pytest.mark.parametrize("position", [[500000, 6000000, 0], [6000000] * 3])
+def test_dense_translated_geometry(position):
+    model = Turbine(50, 3, 120, yaw=.37, rotor_angle=.29)
+    original = _group_surfaces(generate_mesh(model, segments=1000))
+    moved = _group_surfaces(generate_mesh(replace(model, position=position), segments=1000))
+    # Coordinate roundoff in metres, and its amplification over a 5 cm strip.
+    length_tol = 32 * np.finfo(float).eps * max(position)
+    normal_tol = length_tol / (model.blade_length / 1000)
+    assert [s.id for s in moved] == [(b, s) for b in range(3) for s in range(4)]
+    for before, after in zip(original, moved):
+        assert_allclose(after.endpoints - position, before.endpoints, rtol=0, atol=length_tol)
+        assert_allclose(after.normal, before.normal, rtol=0, atol=normal_tol)
+        assert_allclose(np.linalg.norm(after.normal), 1, rtol=0, atol=1e-14)
+        assert abs((after.endpoints[1] - after.endpoints[0]) @ after.normal) <= 50 * normal_tol
+
+
+@pytest.mark.parametrize("position", [[500000, 6000000, 0], [6000000] * 3])
+@pytest.mark.parametrize("damage", ["reversed", "off_plane", "tilted"])
+def test_dense_translated_malformed_geometry(position, damage):
+    model = Turbine(50, 3, 120, position=position, yaw=.37, rotor_angle=.29)
+    mesh = generate_mesh(model, segments=1000)
+    triangles = mesh.triangles.copy()
+    outward = -frame(model, 0)[:, 1]
+    if damage == "reversed":
+        triangles[0] = triangles[0, ::-1]
+    elif damage == "off_plane":
+        triangles[:2000] += 0.001 * outward
+    else:
+        triangles[0, 0] += 0.001 * outward
+    with pytest.raises(ValueError):
+        _group_surfaces(Mesh(triangles, mesh.blade_ids, model))

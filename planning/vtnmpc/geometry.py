@@ -80,6 +80,27 @@ def _triangle_data(triangles):
     return centroids, normals
 
 
+def _normal_errors(triangles):
+    """Bound unit-normal error from rounded world vertices and edge conditioning."""
+    eps = np.finfo(float).eps
+    edges = triangles[:, 1:] - triangles[:, :1]
+    lengths = np.linalg.norm(edges, axis=2)
+    area = np.linalg.norm(np.cross(edges[:, 0], edges[:, 1]), axis=1)
+    # Two world-coordinate additions in generation: allow 2 eps per coordinate.
+    # Each edge subtracts two such vertices, plus its own subtraction roundoff.
+    vertex_error = 2 * eps * np.linalg.norm(np.max(np.abs(triangles), axis=1), axis=1)
+    edge_error = 2 * vertex_error[:, None] + eps * lengths
+    # ||delta(e1 x e2)|| <= d1 L2 + d2 L1 + d1 d2,
+    # plus cross-product arithmetic (products, subtraction and norm rounding).
+    cross_error = (edge_error[:, 0] * lengths[:, 1]
+                   + edge_error[:, 1] * lengths[:, 0]
+                   + edge_error.prod(axis=1) + 8 * eps * lengths.prod(axis=1))
+    if np.any(cross_error >= area) or not np.all(np.isfinite(cross_error)):
+        raise ValueError("triangle normals are unresolved at coordinate precision")
+    # Normalization changes direction by at most 2 ||delta cross|| / ||cross||.
+    return 2 * cross_error / area
+
+
 @dataclass(frozen=True, eq=False)
 class Mesh:
     """Generated triangle vertices [N,3,3], physical blade IDs [N], and model."""
@@ -154,6 +175,7 @@ def _group_surfaces(mesh):
     if not isinstance(mesh, Mesh):
         raise ValueError("mesh must be a Mesh")
     centroids, normals = _triangle_data(mesh.triangles)
+    normal_errors = _normal_errors(mesh.triangles)
     turbine = mesh.turbine
     scale = max(turbine.blade_length, turbine.blade_width)
     length_tol = scale * 1e-8 + 32 * np.finfo(float).eps * np.max(np.abs(mesh.triangles))
@@ -168,12 +190,16 @@ def _group_surfaces(mesh):
         groups = []
         for index in indices:
             normal, center = normals[index], centroids[index]
-            if abs(abs(normal @ axis) - 1) <= _DIRECTION_TOL:
+            if min(np.linalg.norm(normal - axis), np.linalg.norm(normal + axis)) <= (
+                    _DIRECTION_TOL + normal_errors[index]):
                 continue
             for group in groups:
                 first = group[0]
-                if (np.linalg.norm(normal - normals[first]) <= _DIRECTION_TOL
-                        and abs((center - centroids[first]) @ normal) <= length_tol):
+                if (np.linalg.norm(normal - normals[first]) <= (
+                        _DIRECTION_TOL + normal_errors[index] + normal_errors[first])
+                        and abs((center - centroids[first]) @ normal) <= (
+                            length_tol + np.linalg.norm(center - centroids[first])
+                            * normal_errors[index])):
                     group.append(index)
                     break
             else:
@@ -186,11 +212,15 @@ def _group_surfaces(mesh):
             normal = normals[group].mean(axis=0)
             normal /= np.linalg.norm(normal)
             side = int(np.argmin(np.linalg.norm(expected - normal, axis=1)))
-            if side in found or np.linalg.norm(normal - expected[side]) > _DIRECTION_TOL:
+            if side in found or np.any(
+                    np.linalg.norm(normals[group] - expected[side], axis=1)
+                    > _DIRECTION_TOL + normal_errors[group]):
                 raise ValueError(f"blade {blade} has invalid long-side normals")
             found.add(side)
             vertices = mesh.triangles[group] - hub
-            if np.any(np.abs(vertices @ normal - widths[side]) > length_tol):
+            # Check actual vertices against the physical plane without amplifying
+            # the measured normal's angular uncertainty over the blade length.
+            if np.any(np.abs(vertices @ expected[side] - widths[side]) > length_tol):
                 raise ValueError(f"blade {blade} side {side} is not on its physical plane")
             longitudinal = (points - hub) @ axis
             # z is the primary key; longitudinal position breaks horizontal ties.
